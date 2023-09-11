@@ -1,0 +1,65 @@
+import com.eviware.soapui.support.XmlHolder
+import com.eviware.soapui.impl.wsdl.testcase.WsdlTestRunContext
+import com.eviware.soapui.support.GroovyUtils
+import com.eviware.soapui.model.testsuite.TestRunner
+import javax.swing.JOptionPane
+
+// Prompt for password
+def password = JOptionPane.showInputDialog(null, "Enter password:", "Password", JOptionPane.QUESTION_MESSAGE)
+
+// Check if password is correct
+if (password == "release") {
+    // Password is correct
+    log.info("Password is correct. Running the code...")
+    
+} else {
+    // Password is incorrect
+    log.error("Incorrect password. Code execution aborted.")
+    
+    // You can choose to throw an exception or exit the script here
+    throw new Exception("Incorrect password. Code execution aborted.")
+}
+
+// Specify the file path
+def filePath = "C:/Users/ethanr3/Desktop/InactiveUsers.csv"
+
+// Read the CSV file
+def csvFile = new File(filePath)
+
+// Get the TestRunner object
+def testRunner = context.testRunner as TestRunner
+
+// Create a List to store distinct IDs
+List<String> requestIDs = []
+csvFile.withReader { reader ->
+    def lineCount = 0
+    reader.eachLine { line ->
+        if (lineCount > 0) {
+            def columns = line.split(",") 
+            if (columns.length >= 10) { // Assuming the Parent ID column is at index 9 (column J)
+                def parentID = columns[9].trim()
+                if (!requestIDs.contains(parentID)) {
+                    requestIDs.add(parentID)
+                }
+            }
+        }
+        lineCount++
+    }
+}
+
+// Get the "hold" test step and context
+def holdReqTest = testRunner.testCase.testSteps["release"]
+def contextHoldReqTest = new WsdlTestRunContext(holdReqTest)
+
+// Iterate over the request IDs
+requestIDs.each { requestId ->
+    def xmlReq = testRunner.testCase.testSteps["release"].getPropertyValue("Request")
+    def samplexmlreq = new XmlHolder(xmlReq)
+  
+    samplexmlreq.setNodeValue("//sch:releaseRequest/sch:requestId", requestId.toString())
+
+    def finalXml = samplexmlreq.getXml()
+    testRunner.testCase.testSteps["release"].setPropertyValue("Request", finalXml)
+
+    holdReqTest.run(testRunner, contextHoldReqTest)
+}
